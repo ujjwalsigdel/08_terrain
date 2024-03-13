@@ -188,7 +188,7 @@ slope_map
 aspect <- idw_pred %>%
   dplyr::select(elev_m = var1.pred) %>%
   terra::rast() %>%
-  ...
+  terra::terrain("aspect", unit="degrees") %>% 
   st_as_stars() %>%
   st_set_crs(value =  6345)
 
@@ -198,7 +198,7 @@ aspect
 
 ```{r aspect map}
 aspect_map <- ggplot()+
-  geom_...(data = aspect)+
+  geom_stars(data = aspect)+
   geom_sf(data = boundary_w, 
           fill = NA)+
   scale_fill_viridis_b(option = "E",
@@ -221,7 +221,7 @@ aspect_map
 flowdir <- idw_pred %>%
   dplyr::select(elev_m = var1.pred) %>%
   terra::rast() %>%
-  ...
+  terra::terrain("flowdir", unit = "radians") %>% 
   st_as_stars() %>%
   st_set_crs(value =  6345)
 
@@ -231,7 +231,7 @@ flowdir
 
 ```{r flowdir map}
 flowdir_map <- ggplot()+
-  geom_...(data = flowdir)+
+  geom_stars(data = flowdir)+
   geom_sf(data = boundary_w, 
           fill = NA)+
   scale_fill_viridis_b(option = "E",
@@ -246,13 +246,27 @@ flowdir_map
 ```
 
 ```{r flowdir map 2}
-ggplot()
+ggplot()+
+  geom_stars(data = flowdir %>% 
+               mutate(flowdir = factor(flowdir))
+             )+
+  geom_sf(data = boundary_w, 
+          fill = NA)+
+  scale_fill_discrete()+
+  labs(fill = "Flow Dir. \n(Radians)")+
+  mytheme_map+
+  facet_wrap(~flowdir)+
+  theme(legend.position = "none")
+  
 
 ```
 ## Quiz 
 ### Based on the map above, which of the panels (1 through 128) appears to have the most data points?
+The panels 1, 128, 2, 64, and 4 appears to have the most data points. 
 
-### Whatever was your answer above, translate that number into a cardinal direction (N, NE, E, SE, S,SW, W, NW). Which cardinal direction is related to the the number you answered above? In other words, in which direction is water moving on this field for most of the pixels?  
+### Whatever was your answer above, translate that number into a cardinal direction (N, NE, E, SE, S,SW, W, NW). Which cardinal direction is related to the the number you answered above? In other words, in which direction is water moving on this field for most of the pixels? 
+For most of the pixels water is moving into Eastern side with some into North and South East: i.e based on the above data points; E, NE, SE, N, and S respectively. 
+
 
 Tip: look into the documentation for function terrain using `help("terrain")`, make sure is the one from package `terra`. You will find your answer there.
 
@@ -270,32 +284,38 @@ ggsave("../output/terrain.png",
 
 # Grid extraction  
 ```{r elev_v}
-elev_v 
+elev_v <- idw_pred %>% 
+  st_as_sf(as_points = F,
+           merge = F) %>% 
+  dplyr::select(elev_m = var1.pred)
 
 elev_v
 ```
 How many rows? What we expected?  
 
 ```{r slope_v}
-slope_v 
+slope_v <- slope %>% 
+  st_as_sf(as_points = F,
+           merge = F) %>% 
+  dplyr::select(slope=pct)
 
 slope_v
 ```
 How many rows? Why is that?  
 
 ```{r aspect_v}
-aspect_v <- ... %>%
+aspect_v <- aspect %>%
   st_as_sf(as_points = F, 
            merge = F) %>%
-  dplyr::select(aspect = values) 
+  dplyr::select(aspect) 
 
 aspect_v
 ```
 ```{r flowdir_v}
-flowdir_v <- ... %>%
+flowdir_v <- flowdir %>%
   st_as_sf(as_points = F, 
            merge = F) %>%
-  dplyr::select(flowdir = values) 
+  dplyr::select(flowdir) 
 
 flowdir_v
 ```
@@ -303,16 +323,26 @@ flowdir_v
 # Joining all topo variables in one object  
 
 ```{r terrain_v }
-terrain_v 
-
-terrain_v %>%
-  summary()
+terrain_v <- elev_v %>% 
+  st_join(slope_v, 
+          join = st_equals,
+          left = T) %>% 
+  st_join(aspect_v,
+                      join = st_equals,
+                      left = T) %>% 
+  st_join(flowdir_v,
+                      join = st_equals,
+                      left = T)
+              
+summary(terrain_v)
 ```
 
 # Exporting  
 Exporting to file to use later for management zone creation.  
 ```{r exporting}
-
+write_sf(terrain_v,
+         "../data/terrain_v.geojson", 
+         delete_dsn = T)
 
 ```
 
